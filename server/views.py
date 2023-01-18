@@ -34,10 +34,10 @@ def register(request):
     ]))
 
     #send csr to certificate authority and get certificate ?????
-
+    
 
     #Save certif in client device??????
-
+    
 
     #Save in LDAP user infos + certif + pub key??????
 
@@ -47,12 +47,20 @@ def register(request):
 
 @api_view(["POST"])
 def login(request):
+
     #get login user object
     body_unicode = request.body.decode('utf-8')
     user = json.loads(body_unicode)
 
     #verify if login data are valid
 
-    #verify certificate
+    #get certificate signature
+    with open(user.username+"_cert.pem", "rb") as cert_file:
+        cert_data = cert_file.read()
+    cert = x509.load_pem_x509_certificate(cert_data)
+    signature = cert.signature
+
+    #verify signature
+    
 
     return Response("login")
