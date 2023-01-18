@@ -8,6 +8,7 @@ import json
 
 
 
+
 @api_view(['POST'])
 def register(request):
 
@@ -21,7 +22,7 @@ def register(request):
     public_key, private_key = rsa.newkeys(2048)
 
     #save private key TO USER DEVICE ????????? OR ENCRYPT
-    with open(user.username+".pem", "wb") as f:
+    with open(user["username"]+".pem", "wb") as f:
         f.write(private_key.save_pkcs1("PEM"))
 
     #create csr
@@ -37,7 +38,8 @@ def register(request):
     
 
     #Save certif in client device??????
-    
+    LDAPServer().add(user)
+    LDAPServer().connect()
 
     #Save in LDAP user infos + certif + pub key??????
 
@@ -55,7 +57,7 @@ def login(request):
     #verify if login data are valid
 
     #get certificate signature
-    with open(user.username+"_cert.pem", "rb") as cert_file:
+    with open(user["username"]+"_cert.pem", "rb") as cert_file:
         cert_data = cert_file.read()
     cert = x509.load_pem_x509_certificate(cert_data)
     signature = cert.signature
@@ -64,3 +66,47 @@ def login(request):
     
 
     return Response("login")
+
+
+from ldap3 import Server, Connection, ALL
+
+# Define server connection details
+ldap_server = "ldap://192.168.0.102:389"
+username = "cn=ines,dc=maxcrc,dc=com"
+password = "ines"
+
+class LDAPServer():
+
+    def connect(self):
+        server = Server(ldap_server)
+        conn = Connection(server, user=username, password=password)
+        conn.bind()
+        
+
+    # Search for an entry
+        base_dn = "dc=maxcrc,dc=com"
+        search_filter = "(cn=ines)"
+        result = conn.search(search_base=base_dn, search_filter=search_filter)
+    # Print the result
+        print(result)
+
+
+    def add(self,user):
+        server = Server(ldap_server)
+        
+        conn = Connection(server, user=username, password=password)
+        attributes = {
+            'objectClass': ['person', 'organizationalPerson', 'inetOrgPerson'],
+            'cn': user["username"],
+            'sn': user["lastName"],
+            'givenName': user["firstName"],
+            'mail': user["email"],
+        }
+        
+        conn.add("cn="+user["username"], attributes=attributes)
+        
+        if not conn.result['result'] == 0:
+            print(conn.result)
+        else:
+            print('Successfully added entry')
+
