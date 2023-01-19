@@ -76,14 +76,19 @@ class CA():
         return cls._instances[cls]
 
 
-    def createCertificate(ca, csr, username):
-        if(path.exists(username+"_cert.pem") and path.isfile(username+"_cert.pem")):
+    def createCertificate(self, csr, username):
+        if(not(path.exists(username+"_cert.pem") and path.isfile(username+"_cert.pem"))):
+            with open(CA_CERT_PATH, "rb") as cert_file:
+                ca_certificate = x509.load_pem_x509_certificate(
+                    cert_file.read(),
+                    default_backend()
+                )
             csr = x509.load_pem_x509_csr(
-                open(csr, 'rb').read(), default_backend())
+                open(username+'_csr.pem', 'rb').read(), default_backend())
             cert_client = x509.CertificateBuilder().subject_name(
                 csr.subject
             ).issuer_name(
-                cert.subject
+                ca_certificate.subject
             ).public_key(
                 csr.public_key()
             ).serial_number(
@@ -99,34 +104,23 @@ class CA():
             cert_client = cert_client.sign(key, hashes.SHA256(), default_backend())
             with open(username+'_cert.pem', 'wb') as f:
                 f.write(cert_client.public_bytes(serialization.Encoding.PEM))
-        else:
-            print('CSR Not Found')
 
 
 
-    def verifyCertificate(username):
-        with open(CA_CERT_PATH, "rb") as cert_file:
-            ca_certificate = x509.load_pem_x509_certificate(
-                cert_file.read(),
-                default_backend()
-                )
+
+    def verifyCertificate(self, username):
+    
         with open(username+"_cert.pem", "rb") as client_cert_file:
             client_certificate = x509.load_pem_x509_certificate(
             client_cert_file.read(),
             default_backend()
             )
-        try:
-            client_certificate.public_key().verify(
+        
+        result = self.ca_pubkey.verify(
             client_certificate.signature,
             client_certificate.tbs_certificate_bytes,
-            x509.AlgorithmIdentifier.from_oid(client_certificate.signature_hash_algorithm.name),
-            )
-            try:
-                client_certificate.check_ca(ca_certificate)
-                return True
-            except:
-                return False
-        except:
-            return False
-
+            padding.PKCS1v15(),
+            client_certificate.signature_hash_algorithm,)
+        print(result)
+        return True
         

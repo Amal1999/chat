@@ -3,7 +3,10 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from cryptography import x509
 from cryptography.x509.oid import NameOID
-import rsa
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import rsa
 import json
 from os import path
 from .certif_authority import CA
@@ -27,11 +30,19 @@ def register(request):
 
 
     #generate private key
-    public_key, private_key = rsa.newkeys(2048)
+    private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=3072,
+            backend=default_backend()
+        )
 
     #save private key TO USER
     with open(user["username"]+".pem", "wb") as f:
-        f.write(private_key.save_pkcs1("PEM"))
+        f.write(private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            ))
 
     #create csr
     csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
@@ -40,17 +51,17 @@ def register(request):
     x509.NameAttribute(NameOID.LOCALITY_NAME, u"INSAT"),
     x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"INSAT"),
     x509.NameAttribute(NameOID.COMMON_NAME, u"INSAT"),
-    ]))
+    ])).sign(private_key, hashes.SHA256(), default_backend())
+    with open(user["username"]+'_csr.pem', "wb") as f:
+        f.write(csr.public_bytes(serialization.Encoding.PEM))
 
     #send csr to certificate authority
     ca.createCertificate(csr, user["username"])
 
     password = user["password"]
     hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-
     #save user
-    db.execute("INSERT INTO users (name, email, username, password) VALUES (%s, %s, %s, %s)", (user["name"], user["email"],user["username"],hashed_password))
-
+    db.execute1("INSERT INTO users (name, email, username, password) VALUES (%s, %s, %s, %s)", (user["name"], user["email"],user["username"],hashed_password))
     return Response(True)
     
 
@@ -63,12 +74,10 @@ def login(request):
 
     #verify if login data are valid
     username = user["username"]
-    userFromDB = db.execute("SELECT * FROM users WHERE username like %s",(user["username"],))
-
-    print(userFromDB)
+    userFromDB = db.execute2("SELECT * FROM users WHERE username like %s",(user["username"],))
 
     if(userFromDB!= None):
-        if (bcrypt.checkpw(user["password"].encode(), userFromDB[3].encode())):
+        if (bcrypt.checkpw(user["password"].encode(), userFromDB[4].encode())):
         #verify signature
             resp = ca.verifyCertificate(user["username"])
             return Response(resp)

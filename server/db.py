@@ -8,7 +8,17 @@ class Database:
             database="ChatRoom"
         )
         
-    def execute(self, query, values=None):
+    def execute1(self, query, values=None):
+        try: 
+            cursor = self.conn.cursor()
+            cursor.execute(query, values)
+            self.conn.commit()
+            cursor.close()
+            return result
+        except:
+            return None
+
+    def execute2(self, query, values=None):
         try: 
             cursor = self.conn.cursor()
             cursor.execute(query, values)
@@ -18,7 +28,6 @@ class Database:
             return result
         except:
             return None
-
 
     def close(self):
         self.conn.close()
