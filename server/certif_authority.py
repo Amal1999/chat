@@ -22,7 +22,6 @@ def caCertifKey():
         if(path.isfile(CA_CERT_PATH) and path.exists(CA_CERT_PATH) and path.isfile(CA_KEY_PATH) and path.exists(CA_KEY_PATH)):
             cert = x509.load_pem_x509_certificate(
                 open(CA_CERT_PATH, 'rb').read(), default_backend())
-            print(cert)
             key = serialization.load_pem_private_key(
                 open(CA_KEY_PATH, 'rb').read(), password=None, backend=default_backend())
         else:
@@ -115,12 +114,13 @@ class CA():
             client_cert_file.read(),
             default_backend()
             )
-        
-        result = self.ca_pubkey.verify(
-            client_certificate.signature,
-            client_certificate.tbs_certificate_bytes,
-            padding.PKCS1v15(),
-            client_certificate.signature_hash_algorithm,)
-        print(result)
-        return True
+        try:
+            result = self.ca_pubkey.verify(
+                client_certificate.signature,
+                client_certificate.tbs_certificate_bytes,
+                padding.PKCS1v15(),
+                client_certificate.signature_hash_algorithm,)
+            return True
+        except:
+            return False
         

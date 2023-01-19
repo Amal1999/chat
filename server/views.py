@@ -16,6 +16,8 @@ import bcrypt
 
 ca = CA()
 db = Database()
+connectedUsers = []
+connectedUsersPubKeys = []
 
 @api_view(['POST'])
 def register(request):
@@ -36,12 +38,20 @@ def register(request):
             backend=default_backend()
         )
 
+    public_key = private_key.public_key()
+
     #save private key TO USER
     with open(user["username"]+".pem", "wb") as f:
         f.write(private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.TraditionalOpenSSL,
                 encryption_algorithm=serialization.NoEncryption()
+            ))
+
+    with open(user["username"]+"_pub.pem", "wb") as f:
+        f.write(public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.PKCS1,
             ))
 
     #create csr
@@ -62,6 +72,7 @@ def register(request):
     hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
     #save user
     db.execute1("INSERT INTO users (name, email, username, password) VALUES (%s, %s, %s, %s)", (user["name"], user["email"],user["username"],hashed_password))
+    connectedUsers.append(user["username"])
     return Response(True)
     
 
@@ -80,9 +91,10 @@ def login(request):
         if (bcrypt.checkpw(user["password"].encode(), userFromDB[4].encode())):
         #verify signature
             resp = ca.verifyCertificate(user["username"])
+            if(resp):
+                connectedUsers.append(user["username"])
             return Response(resp)
         else:
             return Response(False)
     else:
         return Response(False)
-    
